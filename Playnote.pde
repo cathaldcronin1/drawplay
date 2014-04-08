@@ -30,7 +30,7 @@ class Playnote {
     }
   }
 
-/**********************/  
+/**********************/
   void freq(float p)
   {
     this.freq = p;
@@ -38,33 +38,34 @@ class Playnote {
 //    println(p);
   }
 
-/**********************/  
+/**********************/
   void vol(float v)
   {
+    println("volume:" + v);
     this.vol = v;
     mynote.setAmplitude(v);
   }
-  
-/**********************/  
+
+/**********************/
   void dura(float d)
   {
     this.dura = d;
   }
-  
-/**********************/  
+
+/**********************/
   void wav(int w)
   {
     this.wav = w;
   }
-  
-/**********************/  
+
+/**********************/
   void noteOn( float dur )
   {
     // the tone oscillator is patched to the output.
-    mynote.patch( out );  
+    mynote.patch( out );
   }
-  
-/**********************/  
+
+/**********************/
   void noteOff()
   {
     // unpatch the tone oscillator when the note is over

@@ -1,10 +1,11 @@
 // node class
 // a node colds a pair of coordinates
 
-class Node {
+class Node
+{
  int x;
  int y;
-  
+
   Node(int a, int b)
   {
     this.x = a;

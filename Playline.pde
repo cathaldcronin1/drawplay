@@ -1,5 +1,5 @@
 // holds a line for playing
-// a playline contains two nodes (from, to), colour of the line, voice (timbre to be used) and 
+// a playline contains two nodes (from, to), colour of the line, voice (timbre to be used) and
 // a boolean, playing, to keep track if it is playing or not, i.e. under the play cursor
 
 class Playline {
@@ -24,60 +24,77 @@ class Playline {
       this.to = b;
     }
   }
-  
+
   void col(int c)
   {
     this.col = c;
+  }
+
+  int getCol()
+  {
+    return this.col;
+  }
+
+  Node getFrom()
+  {
+    return this.from;
+  }
+
+  Node getTo()
+  {
+    return this.to;
   }
 
 //  void voice(int v)
 //  {
 //    this.voice = v;
 //  }
-  
+
   void playing(boolean p)
   {
     this.playing = p;
   }
-  
+
 //  void start(int s)
 //  {
 //    this.start = s;
 //  }
-//  
+//
 //  void end(int e)
 //  {
 //    this.end = e;
 //  }
-  
-  void drawit()
+
+  void drawit(int penWeight)
   {
     stroke(col);
-    strokeWeight(10);
-    line(from.x, from.y, to.x, to.y);
-    
-    if((curplay > from.x)  && (curplay < to.x))
+    strokeWeight(penWeight);
+    if (from.x > 175 && to.x > 175)
     {
-      // the playcursor is over this line
-      if(this.playing == false)
+      line(from.x, from.y, to.x, to.y);
+      if((curplay > from.x)  && (curplay < to.x))
       {
-        this.playing = true;
-      } 
+        // the playcursor is over this line
+        if(this.playing == false)
+        {
+          this.playing = true;
+        }
+      }
+      else {
+        this.playing = false;
+      }
     }
     else
     {
       this.playing = false;
     }
   }
-  
+
   float tracker()
   {  // calculate if there is any change in pitch due to sloping line
     float alpha = atan((float)(to.y - from.y));
-//    print("from: " + from.y + " to: " + to.y + " ");
-//    println(alpha);
     float update = ((float)curplay - from.x) * sin(alpha);
     return(update + from.y);
   }
+
 }
-
-
