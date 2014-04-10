@@ -41,7 +41,6 @@ class Playnote {
 /**********************/
   void vol(float v)
   {
-    println("volume:" + v);
     this.vol = v;
     mynote.setAmplitude(v);
   }

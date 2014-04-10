@@ -69,7 +69,7 @@ class Playline {
   {
     stroke(col);
     strokeWeight(penWeight);
-    if (from.x > 175 && to.x > 175)
+    if (from.x >= 0 && to.x >=0 && from.y < 550 && to.y < 550)
     {
       line(from.x, from.y, to.x, to.y);
       if((curplay > from.x)  && (curplay < to.x))

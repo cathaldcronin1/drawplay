@@ -20,8 +20,12 @@ AudioOutput out;
 int MAXITEMS = 100;
 
 // set up arrays to hold lines and tones
-Playline[] mylines = new Playline[MAXITEMS];
-Playnote[] mynotes = new Playnote[MAXITEMS];
+// Playline[] mylines = new Playline[MAXITEMS];
+// Playnote[] mynotes = new Playnote[MAXITEMS];
+
+ArrayList<Playline> mylines = new ArrayList<Playline>();
+ArrayList<Playnote> mynotes = new ArrayList<Playnote>();
+ArrayList<Playline> undid_lines = new ArrayList<Playline>();
 
 boolean helper = false;
 boolean drawing = false;
@@ -40,22 +44,43 @@ int starty = 0;
 int stopx = 0;
 int stopy = 0;
 int lastcoord = 1; // index to last item added
-int curplay = 175;
+int curplay = 0;
 int mybpm = 120; // the playback speed
 float current_vol = 0.1;
 
 int oldMouseX, oldMouseY;
 
 // GP4 GUI
-GCustomSlider slider;
+GPanel panel1;
+
+GButton save_lines;
+GButton load_lines;
+
+GButton play_button;
+GButton stop_button;
+GButton quit_button;
+
+GButton undo;
+GButton redo;
+
+GCustomSlider red_slider;
+GCustomSlider blue_slider;
+GCustomSlider green_slider;
+GCustomSlider yellow_slider;
+
+GToggleGroup colours;
 
 GOption red_checkbox ;
 GOption blue_checkbox ;
 GOption green_checkbox ;
 GOption yellow_checkbox ;
 
-GPanel panel1;
-GToggleGroup colours;
+GButton clear_screen;
+
+JSONArray saved_lines;
+
+GKnob bpm_knob;
+GLabel label;
 
 void setup()
 {
@@ -65,40 +90,17 @@ void setup()
   // Create the font
   f = createFont("SansSerif-12.vlw", 12);
   myPenStroke = color(0, 0, 0);
-  myPenWeight = 1;
+  myPenWeight = 10;
   textFont(f);
 
   tool = "Tools";
   background(#E8DCDC);
   line (175, 0, 175, 800);
-  // fill (0);
-  // text (tool, 40, 30);
-  // fill (#2723B7);
-  // text ("Colors", 10, 50);
-  // text ("Line Effects", 10, 120);
-  // text ("Erase", 10, 200);
-  // text ("Clear Screen", 10, 310);
+  saved_lines = new JSONArray();
 
   // we pass this to Minim so that it can load files from the data directory
   minim = new Minim(this);
   out = minim.getLineOut();
-
-  Node here = new Node(0, 0);
-  Node there = new Node(0, 0);
-  Playline theline = new Playline(here, there);
-  theline.playing = false;
-
-  Playnote thenote = new Playnote(0);
-  thenote.playing = false;
-
-  // initialise the array
-  int i = 0;
-  for(i=0; i<100; i++)
-  {
-    mylines[i] = theline;
-    mynotes[i] = thenote;
-
-  }
 
   // let's start the MIDI thread for timing
   midi=new MidiThread(120); // this is 120 BPM as initial tempo
@@ -125,9 +127,9 @@ void draw()
       line(startx, starty, mouseX, mouseY);
     }
 
-  //color buttons
+//color buttons
   //red button
-  fill(255, 0, 0);
+  // fill(255, 0, 0);
   // stroke(0);
   // strokeWeight(1);
   // ellipse(20, 80, 20, 20);
@@ -232,33 +234,35 @@ void draw()
   // text ("Colors", 10, 50);
   // text ("Line Effects", 10, 120);
   // text ("Erase", 10, 200);
-  // text ("Clear Screen", 10, 310);
+// text ("Clear Screen", 10, 310);
 
     // show the previously drawn lines
-    for(i=0; i< lastcoord; i++)
-    {  // loop through the arrays
+    for(i=0; i< mylines.size(); i++)
+    {
+        // mylines[i].drawit(myPenWeight);  // display a line
 
-      mylines[i].drawit(myPenWeight);  // display a line
+        mylines.get(i).drawit(myPenWeight);
 
-      if(mylines[i].playing != mynotes[i].playing)
-      { //a line is there but we're not playing yet
-        if(mylines[i].playing == true)
-        { //if the line is there, start playing
-          mynotes[i].noteOn( 1.0f / mynotes[i].dura);
-          mynotes[i].playing = true;
+        if(mylines.get(i).playing != mynotes.get(i).playing)
+        { //a line is there but we're not playing yet
+          if(mylines.get(i).playing == true)
+          { //if the line is there, start playing
+            mynotes.get(i).noteOn( 1.0f / mynotes.get(i).dura);
+            mynotes.get(i).playing = true;
+          }
+          else
+          {  // there's no line here, so stop playing
+            mynotes.get(i).noteOff();
+            mynotes.get(i).playing = false;
+          }
         }
-        else
-        {  // there's no line here, so stop playing
-          mynotes[i].noteOff();
-          mynotes[i].playing = false;
+        if(mynotes.get(i).playing == true)
+        {  // update the pitch of a line playing
+          deltaf = mylines.get(i).tracker();
+          mynotes.get(i).freq(200 + (1000 * (height - deltaf) / height));
         }
-      }
-      if(mynotes[i].playing == true)
-      {  // update the pitch of a line playing
-        deltaf = mylines[i].tracker();
-        mynotes[i].freq(200 + (1000 * (height - deltaf) / height));
-      }
     }
+
 
 
    // show the play cursor, a vertical line moving across the window
@@ -292,9 +296,236 @@ public void yellow_checkbox_clicked(GOption source, GEvent event)
   curwav = 4;
 }
 
-public void volume_control(GCustomSlider source, GEvent event)
+public void red_vol_control(GCustomSlider source, GEvent event)
 {
-  current_vol = source.getValueF();
+  println(source);
+    for (int i = 0; i < mynotes.size(); i++)
+    {
+      if(mylines.get(i).getCol() == #FF0000)
+      {
+        mynotes.get(i).vol(source.getValueF());
+      }
+    }
+}
+
+public void green_vol_control(GCustomSlider source, GEvent event)
+{
+
+    for (int i = 0; i < mynotes.size(); i++)
+    {
+      if(mylines.get(i).getCol() == #00FF00)
+      {
+        mynotes.get(i).vol(source.getValueF());
+      }
+    }
+}
+
+public void blue_vol_control(GCustomSlider source, GEvent event)
+{
+  for (int i = 0; i < mynotes.size(); i++)
+    {
+      if(mylines.get(i).getCol() == #0000FF)
+      {
+        mynotes.get(i).vol(source.getValueF());
+      }
+    }
+}
+
+public void yellow_vol_control(GCustomSlider source, GEvent event)
+{
+  for (int i = 0; i < mynotes.size(); i++)
+    {
+      if(mylines.get(i).getCol() == #FFFF00)
+      {
+        mynotes.get(i).vol(source.getValueF());
+      }
+    }
+}
+
+public void save_clicked(GButton button, GEvent event)
+{
+  selectOutput("Select a file to write to:", "saveFile");
+}
+
+public void load_clicked(GButton button, GEvent event)
+{
+  // selectInput("Choose file to Load");
+  selectInput("Select a file to process:", "loadFile");
+}
+
+void saveFile(File selection)
+{
+  if (selection == null)
+  {
+    println("Window was closed or the user hit cancel.");
+  }
+  else
+  {
+    println("Saved to... " + selection.getAbsolutePath());
+    saveLines();
+    saveJSONArray(saved_lines, selection.getAbsolutePath());
+  }
+}
+
+void loadFile(File selection)
+{
+  if (selection == null)
+  {
+    println("Window was closed or the user hit cancel.");
+  }
+  else
+  {
+    String file = selection.getAbsolutePath();
+    loadLines(file);
+  }
+}
+
+void saveLines()
+{
+   for(int i = 0; i < mylines.size(); i++)
+   {
+      // create json line object
+      JSONObject line_to_save = new JSONObject();
+      int line_col = mylines.get(i).getCol();
+
+      // x1 y1
+      int x1 = mylines.get(i).getFrom().getX();
+      int y1 = mylines.get(i).getFrom().getY();
+
+      // x2 y2
+      int x2 = mylines.get(i).getTo().getX();
+      int y2 = mylines.get(i).getTo().getY();
+
+      // set from x value
+      line_to_save.setInt("from_x1", x1);
+
+      // set from y value
+      line_to_save.setInt("from_y1", y1);
+
+      // set to x value
+      line_to_save.setInt("to_x2", x2);
+
+      // set to y value
+      line_to_save.setInt("to_y2", y2);
+
+      // set colour of line
+      line_to_save.setInt("col", line_col);
+
+      // add line to array of JSON lines
+      saved_lines.append(line_to_save);
+   }
+
+}
+
+void loadLines(String file)
+{
+  saved_lines = loadJSONArray(file);
+  println("File loaded:" + saved_lines);
+  for (int i = 0; i < saved_lines.size(); i++)
+  {
+
+    JSONObject saved_line = saved_lines.getJSONObject(i);
+
+    int col = saved_line.getInt("col");
+    int x1 = saved_line.getInt("from_x1");
+    int y1 = saved_line.getInt("from_y1");
+    int x2 = saved_line.getInt("to_x2");
+    int y2 = saved_line.getInt("to_y2");
+
+    Node here = new Node(x1, y1);
+    Node there = new Node(x2, y2);
+    Playline theline = new Playline(here, there);
+
+    Playnote thenote = new Playnote(curwav);
+    thenote.vol(current_vol);
+    if(stopx > startx)
+    {
+      thenote.freq(200 + (1000 * (height - starty) / height));
+      thenote.dura((stopx - startx)/width);
+    }
+    else
+    {
+      thenote.freq(200 + (1000 * (height - stopy) / height));
+      thenote.dura((startx - stopx)/width);
+    }
+      theline.col = col;
+      mylines.add(theline);
+      mynotes.add(thenote);
+  }
+}
+
+public void speed_knob(GKnob source, GEvent event)
+{
+  mybpm = source.getValueI();
+  midi.quit(); // stop the thread
+  midi = new MidiThread(mybpm); // set the new bpm value
+  midi.start(); // start the thread again
+}
+
+public void panel1_Click1(GPanel panel, GEvent event)
+{
+  // Do Nothing
+}
+
+public void Play_Clicked(GButton button, GEvent event)
+{
+  playing = true;
+}
+
+public void Stop_Clicked(GButton button, GEvent event)
+{
+  playing = false;
+}
+
+public void Clear_Clicked(GButton button, GEvent event)
+{
+  mylines.clear();
+  mynotes.clear();
+  minim.stop();
+  out = minim.getLineOut();
+}
+
+public void Quit_Clicked(GButton button, GEvent event)
+{
+    out.close();
+    minim.stop();
+    stop();
+    exit();
+}
+
+public void undo_clicked(GButton button, GEvent event)
+{
+  if (mylines.size() > 0)
+  {
+
+    int last_element = mylines.size() - 1;
+    println(last_element);
+
+    //Store line
+    undid_lines.add(mylines.get(last_element));
+
+    // Remove last line in mylines
+    mylines.remove(last_element);
+
+    minim.stop();
+    out = minim.getLineOut();
+  }
+}
+
+public void redo_clicked(GButton button, GEvent event)
+{
+  if (undid_lines.size() > 0)
+  {
+
+    int last_element = undid_lines.size() - 1;
+
+    // For each line that was undid, add back
+    mylines.add(undid_lines.get(last_element));
+    undid_lines.remove(last_element);
+
+    minim = new Minim(this);
+    out = minim.getLineOut();
+  }
 }
 
 void createGUI()
@@ -304,8 +535,7 @@ void createGUI()
   G4P.setCursor(ARROW);
   if(frame != null)
     frame.setTitle("Drawplay");
-  panel1 = new GPanel(this, 0, 635, 800, 164, "Drawplay");
-  panel1.setText("Tab bar text");
+  panel1 = new GPanel(this, 0, 550, 800, 250, "Drawplay");
   panel1.setOpaque(true);
   panel1.addEventHandler(this, "panel1_Click1");
   panel1.setDraggable(false);
@@ -313,28 +543,28 @@ void createGUI()
 
   colours = new GToggleGroup();
 
-  red_checkbox = new GOption(this, 10, 35, 120, 20);
+  red_checkbox = new GOption(this, 10, 50, 120, 20);
   red_checkbox.setTextAlign(GAlign.LEFT, GAlign.MIDDLE);
   red_checkbox.setText("Red");
   red_checkbox.setTextBold();
   red_checkbox.setOpaque(false);
   red_checkbox.addEventHandler(this, "red_checkbox_clicked");
+  red_checkbox.setLocalColorScheme(GCScheme.RED_SCHEME);
 
-  blue_checkbox = new GOption(this, 10, 65, 120, 20);
+  blue_checkbox = new GOption(this, 10, 95, 120, 20);
   blue_checkbox.setTextAlign(GAlign.LEFT, GAlign.MIDDLE);
   blue_checkbox.setText("Blue");
   blue_checkbox.setOpaque(false);
   blue_checkbox.addEventHandler(this, "blue_checkbox_clicked");
 
-  green_checkbox = new GOption(this, 10, 95, 120, 20);
+  green_checkbox = new GOption(this, 10, 140, 120, 20);
   green_checkbox.setTextAlign(GAlign.LEFT, GAlign.MIDDLE);
   green_checkbox.setText("Green");
   green_checkbox.setOpaque(false);
   green_checkbox.addEventHandler(this, "green_checkbox_clicked");
 
-  yellow_checkbox = new GOption(this, 10, 120, 120, 20);
+  yellow_checkbox = new GOption(this, 10, 185, 120, 20);
   yellow_checkbox.setTextAlign(GAlign.LEFT, GAlign.MIDDLE);
-  yellow_checkbox.setText("Yellow");
   yellow_checkbox.setText("Yellow");
   yellow_checkbox.setOpaque(false);
   yellow_checkbox.addEventHandler(this, "yellow_checkbox_clicked");
@@ -344,15 +574,93 @@ void createGUI()
   colours.addControl(green_checkbox);
   colours.addControl(yellow_checkbox);
 
-  slider = new GCustomSlider(this, 350, 62, 253, 50, "blue18px");
-  slider.setShowValue(true);
-  slider.setShowLimits(true);
-  slider.setLimits(current_vol, 0, 1);
-  slider.setNumberFormat(G4P.DECIMAL, 1);
-  slider.setOpaque(false);
-  slider.addEventHandler(this, "volume_control");
+  red_slider    = new GCustomSlider(this, 70, 15, 99, 80,  "blue18px");
+  blue_slider   = new GCustomSlider(this, 70, 65, 99, 80,  "blue18px");
+  green_slider  = new GCustomSlider(this, 70, 110, 99, 80, "blue18px");
+  yellow_slider = new GCustomSlider(this, 70, 165, 99, 80, "blue18px");
 
-  panel1.addControl(slider);
+  // red_slider.setShowValue(true);
+  red_slider.setShowLimits(true);
+  red_slider.setLimits(current_vol, 0, 1);
+  red_slider.setNumberFormat(G4P.DECIMAL, 1);
+  red_slider.setOpaque(false);
+  red_slider.addEventHandler(this, "red_vol_control");
+
+  // blue_slider.setShowValue(true);
+  blue_slider.setShowLimits(true);
+  blue_slider.setLimits(current_vol, 0, 1);
+  blue_slider.setNumberFormat(G4P.DECIMAL, 1);
+  blue_slider.setOpaque(false);
+  blue_slider.addEventHandler(this, "blue_vol_control");
+
+  // green_slider.setShowValue(true);
+  green_slider.setShowLimits(true);
+  green_slider.setLimits(current_vol, 0, 1);
+  green_slider.setNumberFormat(G4P.DECIMAL, 1);
+  green_slider.setOpaque(false);
+  green_slider.addEventHandler(this, "green_vol_control");
+
+  // yellow_slider.setShowValue(true);
+  yellow_slider.setShowLimits(true);
+  yellow_slider.setLimits(current_vol, 0, 1);
+  yellow_slider.setNumberFormat(G4P.DECIMAL, 1);
+  yellow_slider.setOpaque(false);
+  yellow_slider.addEventHandler(this, "yellow_vol_control");
+
+
+
+  bpm_knob = new GKnob(this, 225, 70, 100, 100, 0.8);
+  bpm_knob.setTurnRange(180, 0);
+  bpm_knob.setTurnMode(GKnob.CTRL_HORIZONTAL);
+  bpm_knob.setSensitivity(1);
+  bpm_knob.setShowArcOnly(true);
+  bpm_knob.setOverArcOnly(true);
+  bpm_knob.setIncludeOverBezel(true);
+  bpm_knob.setShowTrack(true);
+  bpm_knob.setLimits(mybpm, 120, 240);
+  bpm_knob.setShowTicks(true);
+  bpm_knob.setOpaque(false);
+  bpm_knob.addEventHandler(this, "speed_knob");
+  bpm_knob.setShowValue(true);
+
+  label = new GLabel(this, 225, 90, 100, 100, "BPM Control");
+  panel1.addControl(label);
+
+  play_button   = new GButton(this, 600, 30, 80, 30, "Play");
+  undo          = new GButton(this, 600, 70, 80, 30, "Undo");
+  save_lines    = new GButton(this, 600, 110, 80, 30, "Save");
+  clear_screen  = new GButton(this, 600, 150, 80, 30, "Clear");
+
+  stop_button   = new GButton(this, 700, 30, 80, 30, "Stop");
+  redo          = new GButton(this, 700, 70, 80, 30, "Redo");
+  load_lines    = new GButton(this, 700, 110, 80, 30, "Load");
+  quit_button   = new GButton(this, 700, 150, 80, 30, "Quit");
+
+  play_button.addEventHandler(this, "Play_Clicked");
+  stop_button.addEventHandler(this, "Stop_Clicked");
+  clear_screen.addEventHandler(this, "Clear_Clicked");
+  quit_button.addEventHandler(this, "Quit_Clicked");
+  save_lines.addEventHandler(this, "save_clicked");
+  load_lines.addEventHandler(this, "load_clicked");
+  undo.addEventHandler(this, "undo_clicked");
+  redo.addEventHandler(this, "redo_clicked");
+
+  panel1.addControl(play_button);
+  panel1.addControl(stop_button);
+  panel1.addControl(quit_button);
+  panel1.addControl(undo);
+  panel1.addControl(redo);
+
+  panel1.addControl(bpm_knob);
+  panel1.addControl(save_lines);
+  panel1.addControl(load_lines);
+
+  panel1.addControl(red_slider);
+  panel1.addControl(blue_slider);
+  panel1.addControl(green_slider);
+  panel1.addControl(yellow_slider);
+
+  panel1.addControl(clear_screen);
   panel1.addControl(red_checkbox);
   panel1.addControl(blue_checkbox);
   panel1.addControl(green_checkbox);
@@ -422,9 +730,9 @@ void keyPressed()
         mybpm = 1;
       }
     }
-   midi.quit(); // stop the thread
-   midi=new MidiThread(mybpm); // set the new bpm value
-   midi.start(); // start the thread again
+   // midi.quit(); // stop the thread
+   // midi=new MidiThread(mybpm); // set the new bpm value
+   // midi.start(); // start the thread again
   }
   // play/stop using the space bar
   if(key == ' ')
@@ -472,30 +780,29 @@ void mouseReleased()
 { // stop drawing
   drawing = false;
   stopP(mouseX, mouseY);
-  Node here = new Node(startx, starty);
-  Node there = new Node(stopx, stopy);
-  Playline theline = new Playline(here, there);
-  Playnote thenote = new Playnote(curwav);
-  thenote.vol(current_vol);
-  if(stopx > startx)
+  if (starty < 550 && stopy < 550)
   {
-    thenote.freq(200 + (1000 * (height - starty) / height));
-    thenote.dura((stopx - startx)/width);
-  }
-  else
-  {
-    thenote.freq(200 + (1000 * (height - stopy) / height));
-    thenote.dura((startx - stopx)/width);
-  }
-  theline.col = curcol;
-  cursor(ARROW);
-  // copy to the arrays
-  mylines[lastcoord] = theline;
-  mynotes[lastcoord] = thenote;
 
-  if(lastcoord < MAXITEMS)
-  {
-    lastcoord++;
+    Node here = new Node(startx, starty);
+    Node there = new Node(stopx, stopy);
+    Playline theline = new Playline(here, there);
+    Playnote thenote = new Playnote(curwav);
+    thenote.vol(current_vol);
+    if(stopx > startx)
+    {
+      thenote.freq(200 + (1000 * (height - starty) / height));
+      thenote.dura((stopx - startx)/width);
+    }
+    else
+    {
+      thenote.freq(200 + (1000 * (height - stopy) / height));
+      thenote.dura((startx - stopx)/width);
+    }
+    theline.col = curcol;
+    cursor(ARROW);
+    // copy to the arrays
+    mylines.add(theline);
+    mynotes.add(thenote);
   }
 }
 

@@ -11,5 +11,15 @@ class Node
     this.x = a;
     this.y = b;
   }
+
+  int getX()
+  {
+    return this.x;
+  }
+
+  int getY()
+  {
+    return this.y;
+  }
 }
 
