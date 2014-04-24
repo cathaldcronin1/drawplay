@@ -96,5 +96,4 @@ class Playline {
     float update = ((float)curplay - from.x) * sin(alpha);
     return(update + from.y);
   }
-
 }
