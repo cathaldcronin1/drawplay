@@ -67,6 +67,3 @@ public void stop() {
     if (midi!=null) midi.isActive=false;
     super.stop();
 }
-
-
-
