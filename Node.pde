@@ -22,4 +22,3 @@ class Node
     return this.y;
   }
 }
-
