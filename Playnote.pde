@@ -77,5 +77,3 @@ class Playnote {
     this.playing = p;
   }
 }
-
-
