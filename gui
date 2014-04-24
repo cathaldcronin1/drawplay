@@ -1,0 +1,482 @@
+/* GP4 GUI */
+
+// Panel to hold all items.
+GPanel panel1;
+
+// Buttons for each action.
+GButton play_button;
+GButton stop_button;
+GButton save_lines;
+GButton load_lines;
+GButton undo;
+GButton redo;
+GButton quit_button;
+GButton clear_screen;
+GButton help_button;
+
+// Checkboxes for line colour to use.
+GToggleGroup colours;
+GOption red_checkbox ;
+GOption blue_checkbox ;
+GOption green_checkbox ;
+GOption yellow_checkbox ;
+
+// Slider per colour to control independent line volume.
+GCustomSlider red_slider;
+GCustomSlider blue_slider;
+GCustomSlider green_slider;
+GCustomSlider yellow_slider;
+
+// Turn knob to vary BPM
+GKnob bpm_knob;
+
+// Label under BPM Knob
+GLabel label;
+
+/* Handlers for checkboxes, buttons, sliders and knobs */
+void red_checkbox_clicked(GOption source, GEvent event)
+{
+  // Set colour and wavetype to be played.
+  curcol = color(255, 0, 0);
+  curwav = 1;
+}
+
+void blue_checkbox_clicked(GOption source, GEvent event)
+{
+  // Set colour and wavetype to be played.
+  curcol = color(0, 0, 255);
+  curwav = 2;
+}
+
+void green_checkbox_clicked(GOption source, GEvent event)
+{
+  // Set colour and wavetype to be played.
+  curcol = color(0, 255, 0);
+  curwav = 3;
+}
+
+void yellow_checkbox_clicked(GOption source, GEvent event)
+{
+  // Set colour and wavetype to be played.
+  curcol = color(#FEFF03);
+  curwav = 4;
+}
+
+void red_vol_control(GCustomSlider source, GEvent event)
+{
+  // Adjust volume to slider value
+    for (int i = 0; i < mynotes.size(); i++)
+    {
+      if(mylines.get(i).getCol() == #FF0000)
+      {
+        mynotes.get(i).vol(source.getValueF());
+      }
+    }
+}
+
+void green_vol_control(GCustomSlider source, GEvent event)
+{
+  // Adjust volume to slider value
+    for (int i = 0; i < mynotes.size(); i++)
+    {
+      if(mylines.get(i).getCol() == #00FF00)
+      {
+        mynotes.get(i).vol(source.getValueF());
+      }
+    }
+}
+
+void blue_vol_control(GCustomSlider source, GEvent event)
+{
+  // Adjust volume to slider value
+  for (int i = 0; i < mynotes.size(); i++)
+    {
+      if(mylines.get(i).getCol() == #0000FF)
+      {
+        mynotes.get(i).vol(source.getValueF());
+      }
+    }
+}
+
+void yellow_vol_control(GCustomSlider source, GEvent event)
+{
+  // Adjust volume to slider value
+  for (int i = 0; i < mynotes.size(); i++)
+    {
+      if(mylines.get(i).getCol() == #FFFF00)
+      {
+        mynotes.get(i).vol(source.getValueF());
+      }
+    }
+}
+
+void save_clicked(GButton button, GEvent event)
+{
+  selectOutput("Select a file to write to:", "saveFile");
+}
+
+void load_clicked(GButton button, GEvent event)
+{
+  // selectInput("Choose file to Load");
+  selectInput("Select a file to process:", "loadFile");
+}
+
+void saveFile(File file_picked)
+{
+  if (file_picked == null)
+  {
+    println("User didn't pick a file");
+  }
+  else
+  {
+    saveLines();
+    saveJSONArray(saved_lines, file_picked.getAbsolutePath());
+  }
+}
+
+void loadFile(File file_picked)
+{
+  if (file_picked == null)
+  {
+    println("User didn't pick a file");
+  }
+  else
+  {
+    String file = file_picked.getAbsolutePath();
+    loadLines(file);
+  }
+}
+
+void saveLines()
+{
+   for(int i = 0; i < mylines.size(); i++)
+   {
+      // Create json line object.
+      JSONObject line_to_save = new JSONObject();
+      int line_col = mylines.get(i).getCol();
+
+      // Get start point (x1,y1)
+      int x1 = mylines.get(i).getFrom().getX();
+      int y1 = mylines.get(i).getFrom().getY();
+
+      // Get end point (x2, y2)
+      int x2 = mylines.get(i).getTo().getX();
+      int y2 = mylines.get(i).getTo().getY();
+
+      // set from x value
+      line_to_save.setInt("from_x1", x1);
+
+      // set from y value
+      line_to_save.setInt("from_y1", y1);
+
+      // set to x value
+      line_to_save.setInt("to_x2", x2);
+
+      // set to y value
+      line_to_save.setInt("to_y2", y2);
+
+      // set colour of line
+      line_to_save.setInt("col", line_col);
+
+      // add line to array of JSON lines
+      saved_lines.append(line_to_save);
+   }
+
+}
+
+void loadLines(String file)
+{
+  // Make a JSON object to iterate through.
+  saved_lines = loadJSONArray(file);
+  for (int i = 0; i < saved_lines.size(); i++)
+  {
+    // Get first line object
+    JSONObject saved_line = saved_lines.getJSONObject(i);
+
+    // Get line information to remake it.
+    int col = saved_line.getInt("col");
+    int x1 = saved_line.getInt("from_x1");
+    int y1 = saved_line.getInt("from_y1");
+    int x2 = saved_line.getInt("to_x2");
+    int y2 = saved_line.getInt("to_y2");
+
+    // Make a line, with a note
+    Node here = new Node(x1, y1);
+    Node there = new Node(x2, y2);
+    Playline theline = new Playline(here, there);
+    Playnote thenote = new Playnote(curwav);
+    thenote.vol(current_vol);
+    if(x2 > x1)
+    {
+      thenote.freq(200 + (1000 * (height - y1) / height));
+      thenote.dura((x2 - x1)/width);
+    }
+    else
+    {
+      thenote.freq(200 + (1000 * (height - y2) / height));
+      thenote.dura((x1 - x2)/width);
+    }
+    // Set colour and add line and note to respective lists.
+      theline.col = col;
+      mylines.add(theline);
+      mynotes.add(thenote);
+  }
+}
+
+void speed_knob(GKnob source, GEvent event)
+{
+  // Set bpm to knob value.
+  mybpm = source.getValueI();
+
+  // Reset midi thread.
+  midi.quit(); 
+  midi = new MidiThread(mybpm);
+  midi.start();
+}
+
+void panel1_Click1(GPanel panel, GEvent event)
+{
+  // Do Nothing //
+}
+
+void play_Clicked(GButton button, GEvent event)
+{
+  if (playing != true)
+  {
+    playing = true;
+    for(int i = 0; i < mylines.size(); i++)
+    {
+      mynotes.get(i).noteOn( 1.0f / mynotes.get(i).dura);
+      mynotes.get(i).playing = true;
+    }
+  }
+}
+
+void stop_Clicked(GButton button, GEvent event)
+{
+  if (playing != false)
+  {
+    playing = false;
+    for(int i = 0; i < mylines.size(); i++)
+    {
+      mynotes.get(i).noteOff();
+      mynotes.get(i).playing = false;
+    }
+  }
+}
+
+void clear_Clicked(GButton button, GEvent event)
+{
+  mylines.clear();
+  mynotes.clear();
+  minim.stop();
+  out = minim.getLineOut();
+}
+
+void quit_Clicked(GButton button, GEvent event)
+{
+    out.close();
+    minim.stop();
+    stop();
+    exit();
+}
+
+void undo_clicked(GButton button, GEvent event)
+{
+  if (mylines.size() > 0)
+  {
+    int last_element = mylines.size() - 1;
+    println(last_element);
+
+    //Store line
+    undid_lines.add(mylines.get(last_element));
+
+    // Remove last line in mylines
+    mylines.remove(last_element);
+
+    minim.stop();
+    out = minim.getLineOut();
+ 
+    mynotes.get(last_element).noteOff();
+    mynotes.get(last_element).playing = false;
+  }
+}
+
+void redo_clicked(GButton button, GEvent event)
+{
+  if (undid_lines.size() > 0)
+  {
+    int last_element = undid_lines.size() - 1;
+
+    // For each line that was undid, add back
+    mylines.add(undid_lines.get(last_element));
+    undid_lines.remove(last_element);
+
+   if(playing == true)
+   {
+      mynotes.get(last_element).noteOn( 1.0f / mynotes.get(last_element).dura);
+      mynotes.get(last_element).playing = true;
+   }
+  }
+}
+
+void help_clicked(GButton button, GEvent event)
+{
+  background(#E1E1E1);
+  if(helper == false)
+  {
+    showHelp();
+    helper = true;
+  }
+  else
+  {
+    helper = false;
+  }
+}
+
+void createGUI()
+{
+  G4P.messagesEnabled(false);
+  G4P.setGlobalColorScheme(GCScheme.BLUE_SCHEME);
+  G4P.setCursor(ARROW);
+  if(frame != null)
+    frame.setTitle("Drawplay");
+
+  // Create panel to add things too.
+  panel1 = new GPanel(this, 0, 550, 800, 250, "Drawplay");
+  panel1.setOpaque(true);
+  panel1.addEventHandler(this, "panel1_Click1");
+  panel1.setDraggable(false);
+  panel1.setCollapsible(false);
+
+  colours = new GToggleGroup();
+
+  red_checkbox = new GOption(this, 10, 50, 120, 20);
+  red_checkbox.setTextAlign(GAlign.LEFT, GAlign.MIDDLE);
+  red_checkbox.setText("Red");
+  red_checkbox.setTextBold();
+  red_checkbox.setOpaque(false);
+  red_checkbox.addEventHandler(this, "red_checkbox_clicked");
+  red_checkbox.setLocalColorScheme(GCScheme.RED_SCHEME);
+
+  blue_checkbox = new GOption(this, 10, 95, 120, 20);
+  blue_checkbox.setTextAlign(GAlign.LEFT, GAlign.MIDDLE);
+  blue_checkbox.setText("Blue");
+  blue_checkbox.setTextBold();
+  blue_checkbox.setOpaque(false);
+  blue_checkbox.addEventHandler(this, "blue_checkbox_clicked");
+  blue_checkbox.setLocalColorScheme(GCScheme.BLUE_SCHEME);
+
+  green_checkbox = new GOption(this, 10, 140, 120, 20);
+  green_checkbox.setTextAlign(GAlign.LEFT, GAlign.MIDDLE);
+  green_checkbox.setText("Green");
+  green_checkbox.setTextBold();
+  green_checkbox.setOpaque(false);
+  green_checkbox.addEventHandler(this, "green_checkbox_clicked");
+  green_checkbox.setLocalColorScheme(GCScheme.GREEN_SCHEME);
+
+  yellow_checkbox = new GOption(this, 10, 185, 120, 20);
+  yellow_checkbox.setTextAlign(GAlign.LEFT, GAlign.MIDDLE);
+  yellow_checkbox.setText("Yellow");
+  yellow_checkbox.setTextBold();
+  yellow_checkbox.setOpaque(false);
+  yellow_checkbox.addEventHandler(this, "yellow_checkbox_clicked");
+  yellow_checkbox.setLocalColorScheme(GCScheme.YELLOW_SCHEME);
+
+  colours.addControl(red_checkbox);
+  colours.addControl(blue_checkbox);
+  colours.addControl(green_checkbox);
+  colours.addControl(yellow_checkbox);
+
+  red_slider    = new GCustomSlider(this, 70, 15, 99, 80,  "blue18px");
+  blue_slider   = new GCustomSlider(this, 70, 65, 99, 80,  "blue18px");
+  green_slider  = new GCustomSlider(this, 70, 110, 99, 80, "blue18px");
+  yellow_slider = new GCustomSlider(this, 70, 165, 99, 80, "blue18px");
+
+  red_slider.setShowLimits(true);
+  red_slider.setLimits(current_vol, 0, 1);
+  red_slider.setNumberFormat(G4P.DECIMAL, 1);
+  red_slider.setOpaque(false);
+  red_slider.addEventHandler(this, "red_vol_control");
+
+  blue_slider.setShowLimits(true);
+  blue_slider.setLimits(current_vol, 0, 1);
+  blue_slider.setNumberFormat(G4P.DECIMAL, 1);
+  blue_slider.setOpaque(false);
+  blue_slider.addEventHandler(this, "blue_vol_control");
+
+  green_slider.setShowLimits(true);
+  green_slider.setLimits(current_vol, 0, 1);
+  green_slider.setNumberFormat(G4P.DECIMAL, 1);
+  green_slider.setOpaque(false);
+  green_slider.addEventHandler(this, "green_vol_control");
+
+  yellow_slider.setShowLimits(true);
+  yellow_slider.setLimits(current_vol, 0, 1);
+  yellow_slider.setNumberFormat(G4P.DECIMAL, 1);
+  yellow_slider.setOpaque(false);
+  yellow_slider.addEventHandler(this, "yellow_vol_control");
+
+  // BPM_knob
+  bpm_knob = new GKnob(this, 225, 70, 100, 100, 0.8);
+  bpm_knob.setTurnRange(180, 0);
+  bpm_knob.setTurnMode(GKnob.CTRL_HORIZONTAL);
+  bpm_knob.setSensitivity(1);
+  bpm_knob.setShowArcOnly(true);
+  bpm_knob.setOverArcOnly(true);
+  bpm_knob.setIncludeOverBezel(true);
+  bpm_knob.setShowTrack(true);
+  bpm_knob.setLimits(mybpm, 120, 240);
+  bpm_knob.setShowTicks(true);
+  bpm_knob.setOpaque(false);
+  bpm_knob.addEventHandler(this, "speed_knob");
+  bpm_knob.setShowValue(true);
+
+  label = new GLabel(this, 225, 90, 100, 100, "BPM Control");
+  panel1.addControl(label);
+
+  // Create all buttons.
+  play_button   = new GButton(this, 600, 30, 80, 30, "Play");
+  undo          = new GButton(this, 600, 70, 80, 30, "Undo");
+  save_lines    = new GButton(this, 600, 110, 80, 30, "Save");
+  clear_screen  = new GButton(this, 600, 150, 80, 30, "Clear");
+  stop_button   = new GButton(this, 700, 30, 80, 30, "Stop");
+  redo          = new GButton(this, 700, 70, 80, 30, "Redo");
+  load_lines    = new GButton(this, 700, 110, 80, 30, "Load");
+  quit_button   = new GButton(this, 700, 150, 80, 30, "Quit");
+  help_button   = new GButton(this, 600, 200, 180, 30, "Help"); 
+
+  // Add handlers for each button.
+  play_button.addEventHandler(this, "play_Clicked");
+  stop_button.addEventHandler(this, "stop_Clicked");
+  clear_screen.addEventHandler(this, "clear_Clicked");
+  quit_button.addEventHandler(this, "quit_Clicked");
+  save_lines.addEventHandler(this, "save_clicked");
+  load_lines.addEventHandler(this, "load_clicked");
+  undo.addEventHandler(this, "undo_clicked");
+  redo.addEventHandler(this, "redo_clicked");
+  help_button.addEventHandler(this, "help_clicked");
+
+  // Add all elements to panel.
+  panel1.addControl(play_button);
+  panel1.addControl(stop_button);
+  panel1.addControl(clear_screen);
+  panel1.addControl(quit_button);
+  panel1.addControl(save_lines);
+  panel1.addControl(load_lines);
+  panel1.addControl(undo);
+  panel1.addControl(redo);
+  panel1.addControl(help_button);
+
+  panel1.addControl(bpm_knob);
+
+  panel1.addControl(red_slider);
+  panel1.addControl(blue_slider);
+  panel1.addControl(green_slider);
+  panel1.addControl(yellow_slider);
+
+  panel1.addControl(red_checkbox);
+  panel1.addControl(blue_checkbox);
+  panel1.addControl(green_checkbox);
+  panel1.addControl(yellow_checkbox);
+}
